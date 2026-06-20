@@ -123,7 +123,7 @@ func (e *envoy) UpdateConfig(config []byte) error {
 	return os.WriteFile(e.ConfigPath, config, 0o666)
 }
 
-func (e *envoy) args(fname string, overrideFname string) []string {
+func (e *envoy) args(fname string, overrideFname string, overrideJSON string) []string {
 	proxyLocalAddressType := "v4"
 	if network.AllIPv6(e.NodeIPs) {
 		proxyLocalAddressType = "v6"
@@ -163,6 +163,8 @@ func (e *envoy) args(fname string, overrideFname string) []string {
 			// Despite the name Envoy also accepts JSON string
 			startupArgs = append(startupArgs, "--config-yaml", s)
 		}
+	} else if overrideJSON != "" {
+		startupArgs = append(startupArgs, "--config-yaml", overrideJSON)
 	}
 
 	if e.Concurrency > 0 {
@@ -198,13 +200,14 @@ func readBootstrapToJSON(fname string) (string, error) {
 }
 
 var (
-	istioBootstrapOverrideVar = env.Register("ISTIO_BOOTSTRAP_OVERRIDE", "", "")
-	enableEnvoyCoreDump       = env.Register("ISTIO_ENVOY_ENABLE_CORE_DUMP", false, "").Get()
+	istioBootstrapOverrideVar     = env.Register("ISTIO_BOOTSTRAP_OVERRIDE", "", "")
+	istioBootstrapOverrideJSONVar = env.Register("ISTIO_BOOTSTRAP_OVERRIDE_JSON", "", "JSON string merged into Envoy bootstrap config. Takes effect when ISTIO_BOOTSTRAP_OVERRIDE is not set.")
+	enableEnvoyCoreDump           = env.Register("ISTIO_ENVOY_ENABLE_CORE_DUMP", false, "").Get()
 )
 
 func (e *envoy) Run(abort <-chan error) error {
 	// spin up a new Envoy process
-	args := e.args(e.ConfigPath, istioBootstrapOverrideVar.Get())
+	args := e.args(e.ConfigPath, istioBootstrapOverrideVar.Get(), istioBootstrapOverrideJSONVar.Get())
 	log.Infof("Envoy command: %v", args)
 
 	/* #nosec */

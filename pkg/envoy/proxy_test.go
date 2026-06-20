@@ -143,9 +143,68 @@ func TestEnvoyArgs(t *testing.T) {
 				t.Errorf("unexpected struct got\n%v\nwant\n%v", testProxy, test)
 			}
 
-			got := test.args("test.json", "testdata/bootstrap.json")
+			got := test.args("test.json", "testdata/bootstrap.json", "")
 			if d := cmp.Diff(got, tc.want); d != "" {
 				t.Errorf("envoyArgs() => (-want +got):\n%s", d)
+			}
+		})
+	}
+}
+
+func TestEnvoyArgsBootstrapOverrideJSON(t *testing.T) {
+	proxyConfig := (*model.NodeMetaProxyConfig)(mesh.DefaultProxyConfig())
+	cfg := ProxyConfig{
+		NodeIPs:       []string{"10.0.0.1"},
+		BinaryPath:    proxyConfig.BinaryPath,
+		ConfigPath:    proxyConfig.ConfigPath,
+		DrainDuration: proxyConfig.DrainDuration,
+	}
+
+	const overrideJSON = `{"admin":{"access_log_path":"/dev/null"}}`
+
+	cases := []struct {
+		name          string
+		overrideFname string
+		overrideJSON  string
+		want          []string
+	}{
+		{
+			name:         "json override applied when no file override",
+			overrideJSON: overrideJSON,
+			want: []string{
+				"-c", "test.json",
+				"--drain-time-s", "45",
+				"--drain-strategy", "immediate",
+				"--local-address-ip-version", "v4",
+				"--file-flush-interval-msec", "1000",
+				"--disable-hot-restart",
+				"--allow-unknown-static-fields",
+				"--config-yaml", overrideJSON,
+			},
+		},
+		{
+			name:          "file override takes priority over json",
+			overrideFname: "testdata/bootstrap.json",
+			overrideJSON:  overrideJSON,
+			want: []string{
+				"-c", "test.json",
+				"--drain-time-s", "45",
+				"--drain-strategy", "immediate",
+				"--local-address-ip-version", "v4",
+				"--file-flush-interval-msec", "1000",
+				"--disable-hot-restart",
+				"--allow-unknown-static-fields",
+				"--config-yaml", `{"key":"value"}`,
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := &envoy{ProxyConfig: cfg}
+			got := e.args("test.json", tc.overrideFname, tc.overrideJSON)
+			if d := cmp.Diff(tc.want, got); d != "" {
+				t.Errorf("args() mismatch (-want +got):\n%s", d)
 			}
 		})
 	}

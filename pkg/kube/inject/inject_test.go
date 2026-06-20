@@ -162,6 +162,15 @@ func TestInjection(t *testing.T) {
 			},
 		},
 		{
+			in:   "hello.yaml",
+			want: "hello-proxy-metadata-json.yaml.injected",
+			mesh: func(m *meshapi.MeshConfig) {
+				m.DefaultConfig.ProxyMetadata = map[string]string{
+					"ISTIO_BOOTSTRAP_OVERRIDE_JSON": `{"admin":{"allow_paths":[{"prefix":"/healthz/ready"}]}}`,
+				}
+			},
+		},
+		{
 			in:       "hello.yaml",
 			want:     "hello-always.yaml.injected",
 			setFlags: []string{"values.global.imagePullPolicy=Always"},
@@ -1772,3 +1781,4 @@ spec:
 		})
 	}
 }
+
